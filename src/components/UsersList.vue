@@ -72,7 +72,7 @@
           </v-form>
         </v-card-text>
         <v-card-actions>
-          <v-btn type="submit" color="blue" dark>
+          <v-btn type="submit" @click="saveUserData" color="blue" dark>
             Сохранить
           </v-btn>
           <v-btn color="blue darken-1" variant="text" @click="cancelEdit">
