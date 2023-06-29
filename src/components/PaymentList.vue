@@ -1,35 +1,42 @@
 <template>
-  <div class="container mx-auto p-4">
+  <v-container class="pt-4">
     <h2 class="text-2xl font-bold mb-4">Платежи</h2>
-    <ul>
-      <li v-for="payment in payments" :key="payment.id" class="flex items-center mb-2">
-        <span class="mr-2">{{ payment.title }}</span>
-        <button @click="showPaymentDetails(payment)" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-          Показать детали
-        </button>
-      </li>
-    </ul>
+    <v-card v-for="payment in payments" :key="payment?.id" class="mb-4">
+      <v-card-title>
+        {{ truncateText(payment?.title, 42) }}
+      </v-card-title>
+      <v-card-actions>
+        <v-btn @click="showPaymentDetails(payment)" color="primary" dark>
+          Детали платежа
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+    <v-dialog v-model="showModal" max-width="500px">
+      <v-card>
+        <v-card-title>
+          Детали платежа
+        </v-card-title>
 
-    <div v-if="selectedPayment && showModal" class="modal fixed top-0 left-0 w-full h-full flex items-center justify-center">
-      <div class="modal-content bg-white p-4">
-        <button @click="closeModal" class="close-btn absolute top-0 right-0 mt-4 mr-4 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-          Закрыть
-        </button>
-        <h3 class="text-xl font-bold mb-2">Детали платежа</h3>
-        <p>Название: {{ selectedPayment.title }}</p>
-        <p>Описание: {{ selectedPayment.body }}</p>
-        <p>Сумма: {{ selectedPayment.id * Math.floor(Math.random() * (100000 - 100 + 1)) + 100 }}</p>
-      </div>
-    </div>
-
-    <div v-if="isLoading" class="loader"></div>
-  </div>
+        <v-divider></v-divider>
+        <v-card-text>
+          <p><b>Название</b>: {{ truncateText(selectedPayment?.title, 21) }}</p>
+          <p><b>Описание</b>: {{ truncateText(selectedPayment?.body, 42) }}</p>
+          <p><b>Сумма</b>: {{ calculateAmount(selectedPayment?.id) }}</p>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn color="blue darken-1" variant="text" @click="closeModal">
+            Закрыть
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </v-container>
 </template>
-
 <script>
 import axios from 'axios';
+import { defineComponent } from 'vue';
 
-export default {
+export default defineComponent({
   data() {
     return {
       payments: [],
@@ -42,18 +49,16 @@ export default {
     this.getPayments();
   },
   methods: {
-    getPayments() {
+    async getPayments() {
       this.isLoading = true;
-      axios
-          .get('https://jsonplaceholder.typicode.com/posts')
-          .then(response => {
-            this.payments = response.data;
-            this.isLoading = false;
-          })
-          .catch(error => {
-            console.error(error);
-            this.isLoading = false;
-          });
+      try {
+        const response = await axios.get('https://jsonplaceholder.typicode.com/posts');
+        this.payments = response.data;
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.isLoading = false;
+      }
     },
     showPaymentDetails(payment) {
       this.selectedPayment = payment;
@@ -62,51 +67,24 @@ export default {
     closeModal() {
       this.selectedPayment = null;
       this.showModal = false;
+    },
+    calculateAmount(id) {
+      return id * Math.floor(Math.random() * (100000 - 100 + 1)) + 100 || '';
+    },
+    truncateText(text, length) {
+      if (text && text.length) {
+        if (text.length <= length) {
+          return this.capitalizeFirstLetter(text);
+        }
+        const truncatedText = text.slice(0, length);
+        return this.capitalizeFirstLetter(truncatedText);
+      }
+    },
+    capitalizeFirstLetter(text) {
+      return text.charAt(0).toUpperCase() + text.slice(1);
     }
   }
-};
+});
 </script>
-
-<style>
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal-content {
-  background-color: white;
-  padding: 20px;
-  position: relative;
-}
-
-.close-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-}
-
-.loader {
-  border: 16px solid #f3f3f3;
-  border-top: 16px solid #3498db;
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  animation: spin 2s linear infinite;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+<style scoped>
 </style>
