@@ -51,14 +51,28 @@
         </v-card-title>
         <v-divider></v-divider>
         <v-card-text>
-          <v-form>
-            <v-text-field v-model="editUser.email" label="Email"></v-text-field>
-            <v-text-field v-model="editUser.name" label="Имя"></v-text-field>
-            <v-text-field v-model="editUser.phone" label="Номер телефона"></v-text-field>
+          <v-form ref="editForm" @submit="saveUserData">
+            <v-text-field
+                v-model="editUser.email"
+                :rules="emailValidationRules"
+                label="Email"
+                required
+            ></v-text-field>
+            <v-text-field
+                v-model="editUser.name"
+                label="Имя"
+                required
+            ></v-text-field>
+            <v-text-field
+                v-model="editUser.phone"
+                :rules="phoneValidationRules"
+                label="Номер телефона"
+                required
+            ></v-text-field>
           </v-form>
         </v-card-text>
         <v-card-actions>
-          <v-btn @click="saveUserData" color="blue" dark>
+          <v-btn type="submit" color="blue" dark>
             Сохранить
           </v-btn>
           <v-btn color="blue darken-1" variant="text" @click="cancelEdit">
@@ -85,8 +99,25 @@ export default defineComponent({
       isLoading: false,
     };
   },
+  computed: {
+    emailValidationRules() {
+      return [
+        (v) => !!v || 'Email обязателен к заполнению',
+        (v) => /.+@.+\..+/.test(v) || 'Введите корректный email',
+      ];
+    },
+    phoneValidationRules() {
+      return [
+        (v) => !!v || 'Номер телефона обязателен к заполнению',
+        (v) => /^\d{10}$/.test(v) || 'Введите 10 цифр номера телефона',
+      ];
+    },
+  },
   mounted() {
-    this.getUsers();
+    this.loadFromLocalStorage();
+    if (this.users.length === 0) {
+      this.getUsers();
+    }
   },
   methods: {
     async getUsers() {
@@ -94,6 +125,7 @@ export default defineComponent({
       try {
         const response = await axios.get('https://jsonplaceholder.typicode.com/users');
         this.users = response.data;
+        this.saveToLocalStorage();
       } catch (error) {
         console.error(error);
       } finally {
@@ -119,12 +151,8 @@ export default defineComponent({
       this.showEditModal = true;
     },
     saveUserData() {
-      // Отправка изменений на сервер
-      // ...
-
-      // Обновление данных пользователя
       Object.assign(this.selectedUser, this.editUser);
-
+      this.saveToLocalStorage();
       this.closeEditModal();
     },
     cancelEdit() {
@@ -135,9 +163,7 @@ export default defineComponent({
       this.showEditModal = false;
     },
     saveTodoList() {
-      // Сохранение списка задач
-      // ...
-
+      this.saveToLocalStorage();
       this.closeTodoModal();
     },
     closeTodoModal() {
@@ -154,7 +180,16 @@ export default defineComponent({
     },
     capitalizeFirstLetter(text) {
       return text.charAt(0).toUpperCase() + text.slice(1);
-    }
+    },
+    saveToLocalStorage() {
+      localStorage.setItem('users', JSON.stringify(this.users));
+    },
+    loadFromLocalStorage() {
+      const users = localStorage.getItem('users');
+      if (users) {
+        this.users = JSON.parse(users);
+      }
+    },
   }
 });
 </script>
