@@ -1,6 +1,11 @@
 <template>
   <v-container class="pt-4">
     <h2 class="text-2xl font-bold mb-4">Пользователи</h2>
+    <v-row v-if="isLoading" class="fill-height" align="center" justify="center">
+      <v-col cols="12" class="text-center">
+        <v-progress-circular indeterminate size="64" color="primary"></v-progress-circular>
+      </v-col>
+    </v-row>
     <v-row>
       <v-col v-for="user in users" :key="user.id" cols="4">
         <v-card class="mb-4" outlined>
@@ -34,7 +39,7 @@
           </v-list>
         </v-card-text>
         <v-divider></v-divider>
-        <v-card-actions>
+        <v-card-actions class="justify-end">
           <v-btn color="blue darken-1" variant="text" @click="closeTodoModal">
             Закрыть
           </v-btn>
@@ -57,6 +62,7 @@
                 :rules="emailValidationRules"
                 label="Email"
                 required
+                no-case-change
             ></v-text-field>
             <v-text-field
                 v-model="editUser.name"
@@ -71,105 +77,122 @@
             ></v-text-field>
           </v-form>
         </v-card-text>
-        <v-card-actions>
-          <v-btn type="submit" @click="saveUserData" color="blue" dark>
-            Сохранить
-          </v-btn>
+        <v-card-actions class="justify-end">
           <v-btn color="blue darken-1" variant="text" @click="cancelEdit">
             Закрыть
+          </v-btn>
+          <v-btn color="blue" @click="saveUserData" dark>
+            Сохранить
           </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
   </v-container>
 </template>
-<script>
-import axios from 'axios';
+
+<script lang="ts">
+import {Todo, User} from '@/modules';
+import axios, { AxiosResponse } from 'axios';
 import { defineComponent } from 'vue';
 
 export default defineComponent({
   data() {
     return {
-      users: [],
-      selectedUser: null,
-      editUser: null,
-      todos: [],
+      users: [] as User[],
+      selectedUser: null as User | null,
+      editUser: null as User | null,
+      todos: [] as Todo[],
       showTodoModal: false,
       showEditModal: false,
       isLoading: false,
     };
   },
   computed: {
-    emailValidationRules() {
+    emailValidationRules(): ((v: string) => string | true)[] {
       return [
-        (v) => !!v || 'Email обязателен к заполнению',
-        (v) => /.+@.+\..+/.test(v) || 'Введите корректный email',
+        (v: string) => !!v || 'Email обязателен к заполнению',
+        (v: string) => /.+@.+\..+/.test(v) || 'Введите корректный email',
       ];
     },
-    phoneValidationRules() {
+    phoneValidationRules(): ((v: string) => string | true)[] {
       return [
-        (v) => !!v || 'Номер телефона обязателен к заполнению',
-        (v) => /^\d{10}$/.test(v) || 'Введите 10 цифр номера телефона',
+        (v: string) => !!v || 'Номер телефона обязателен к заполнению',
+        (v: string) => /^\d{10}$/.test(v) || 'Введите 10 цифр номера телефона',
       ];
     },
   },
-  mounted() {
+  async mounted() {
     this.loadFromLocalStorage();
-    if (this.users.length === 0) {
-      this.getUsers();
+    if (this.users.length === 0 || this.todos.length === 0) {
+      await Promise.all([this.getUsers(), this.getTodos()]);
     }
   },
   methods: {
-    async getUsers() {
-      this.isLoading = true;
+    async getUsers(): Promise<void> {
       try {
-        const response = await axios.get('https://jsonplaceholder.typicode.com/users');
+        const response: AxiosResponse<User[]> = await axios.get('https://jsonplaceholder.typicode.com/users');
         this.users = response.data;
         this.saveToLocalStorage();
       } catch (error) {
         console.error(error);
-      } finally {
-        this.isLoading = false;
       }
     },
-    async showUserDetails(user) {
+
+    async getTodos(): Promise<void> {
+      try {
+        const response: AxiosResponse<Todo[]> = await axios.get('https://jsonplaceholder.typicode.com/todos');
+        this.todos = response.data;
+        this.saveToLocalStorage();
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    async showUserDetails(user: User): Promise<void> {
       this.selectedUser = user;
       this.isLoading = true;
       try {
-        const response = await axios.get(`https://jsonplaceholder.typicode.com/users/${user.id}/todos`);
-        this.todos = response.data;
-        this.showTodoModal = true;
+        if (localStorage.getItem('todos') && JSON.parse(localStorage.getItem('todos')!).length > 0) {
+          this.todos = JSON.parse(localStorage.getItem('todos')!) as Todo[];
+          this.showTodoModal = true;
+        } else {
+          const response: AxiosResponse<Todo[]> = await axios.get(`https://jsonplaceholder.typicode.com/users/${user.id}/todos`);
+          this.todos = response.data;
+          this.showTodoModal = true;
+        }
       } catch (error) {
         console.error(error);
       } finally {
         this.isLoading = false;
       }
     },
-    openEditModal(user) {
+
+    openEditModal(user: User): void {
       this.selectedUser = user;
       this.editUser = { ...user };
       this.showEditModal = true;
     },
-    saveUserData() {
-      Object.assign(this.selectedUser, this.editUser);
-      this.saveToLocalStorage();
-      this.closeEditModal();
+    saveUserData(): void {
+      if (this.selectedUser && this.editUser) {
+        Object.assign(this.selectedUser, this.editUser);
+        this.saveToLocalStorage();
+        this.closeEditModal();
+      }
     },
-    cancelEdit() {
+    cancelEdit(): void {
       this.editUser = null;
       this.closeEditModal();
     },
-    closeEditModal() {
+    closeEditModal(): void {
       this.showEditModal = false;
     },
-    saveTodoList() {
+    saveTodoList(): void {
       this.saveToLocalStorage();
       this.closeTodoModal();
     },
-    closeTodoModal() {
+    closeTodoModal(): void {
       this.showTodoModal = false;
     },
-    truncateText(text, length) {
+    truncateText(text: string, length: number): string | undefined {
       if (text && text.length) {
         if (text.length <= length) {
           return this.capitalizeFirstLetter(text);
@@ -178,21 +201,27 @@ export default defineComponent({
         return this.capitalizeFirstLetter(truncatedText);
       }
     },
-    capitalizeFirstLetter(text) {
+    capitalizeFirstLetter(text: string): string {
       return text.charAt(0).toUpperCase() + text.slice(1);
     },
-    saveToLocalStorage() {
+    saveToLocalStorage(): void {
       localStorage.setItem('users', JSON.stringify(this.users));
+      localStorage.setItem('todos', JSON.stringify(this.todos));
     },
-    loadFromLocalStorage() {
+    loadFromLocalStorage(): void {
       const users = localStorage.getItem('users');
+      const todos = localStorage.getItem('todos');
       if (users) {
-        this.users = JSON.parse(users);
+        this.users = JSON.parse(users) as User[];
+      }
+      if (todos) {
+        this.todos = JSON.parse(todos) as Todo[];
       }
     },
   }
 });
 </script>
+
 <style scoped>
 .line-through label {
   text-decoration: line-through;

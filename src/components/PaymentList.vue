@@ -1,6 +1,13 @@
 <template>
   <v-container class="pt-4">
     <h2 class="text-2xl font-bold mb-4">Платежи</h2>
+
+    <v-row v-if="isLoading" class="fill-height" align="center" justify="center">
+      <v-col cols="12" class="text-center">
+        <v-progress-circular indeterminate size="64" color="primary"></v-progress-circular>
+      </v-col>
+    </v-row>
+
     <v-card v-for="payment in payments" :key="payment?.id" class="mb-4">
       <v-card-title>
         {{ truncateText(payment?.title, 42) }}
@@ -11,6 +18,7 @@
         </v-btn>
       </v-card-actions>
     </v-card>
+
     <v-dialog v-model="showModal" max-width="500px">
       <v-card>
         <v-card-title>
@@ -32,46 +40,68 @@
     </v-dialog>
   </v-container>
 </template>
-<script>
-import axios from 'axios';
+
+<script lang="ts">
+import axios, { AxiosResponse } from 'axios';
 import { defineComponent } from 'vue';
+import {Payment} from "@/modules";
 
 export default defineComponent({
   data() {
     return {
-      payments: [],
-      selectedPayment: null,
+      payments: [] as Payment[],
+      selectedPayment: null as Payment | null,
       showModal: false,
       isLoading: false
     };
   },
+
   mounted() {
-    this.getPayments();
+    this.loadFromLocalStorage();
+    if (this.payments.length === 0) {
+      this.getPayments();
+    }
   },
   methods: {
-    async getPayments() {
+    async getPayments(): Promise<void> {
       this.isLoading = true;
       try {
-        const response = await axios.get('https://jsonplaceholder.typicode.com/posts');
-        this.payments = response.data;
+        if (localStorage.getItem('payments')) {
+          this.payments = JSON.parse(localStorage.getItem('payments')!) as Payment[];
+        } else {
+          const response: AxiosResponse<Payment[]> = await axios.get('https://jsonplaceholder.typicode.com/posts');
+          this.payments = response.data;
+        }
       } catch (error) {
         console.error(error);
       } finally {
         this.isLoading = false;
+        this.saveToLocalStorage();
       }
     },
-    showPaymentDetails(payment) {
+    showPaymentDetails(payment: Payment): void {
       this.selectedPayment = payment;
       this.showModal = true;
     },
-    closeModal() {
+    saveToLocalStorage(): void {
+      localStorage.setItem('payments', JSON.stringify(this.payments));
+    },
+
+    loadFromLocalStorage(): void {
+      const payments = localStorage.getItem('payments');
+      if (payments) {
+        this.payments = JSON.parse(payments) as Payment[];
+      }
+    },
+
+    closeModal(): void {
       this.selectedPayment = null;
       this.showModal = false;
     },
-    calculateAmount(id) {
-      return id * Math.floor(Math.random() * (100000 - 100 + 1)) + 100 || '';
+    calculateAmount(id: number | undefined): string {
+      return (id ? id * Math.floor(Math.random() * (100000 - 100 + 1)) + 100 : '') as string;
     },
-    truncateText(text, length) {
+    truncateText(text: string | undefined, length: number): string | undefined {
       if (text && text.length) {
         if (text.length <= length) {
           return this.capitalizeFirstLetter(text);
@@ -80,11 +110,15 @@ export default defineComponent({
         return this.capitalizeFirstLetter(truncatedText);
       }
     },
-    capitalizeFirstLetter(text) {
+    capitalizeFirstLetter(text: string): string {
       return text.charAt(0).toUpperCase() + text.slice(1);
     }
   }
 });
 </script>
+
 <style scoped>
+.fill-height {
+  height: 100vh;
+}
 </style>
